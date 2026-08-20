@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Class Website</title>
+<link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+
+  <div id="gate" class="gate">
+    <form id="gate-form" class="gate-card">
+      <h1>Welcome</h1>
+      <p>Enter the class passcode to continue.</p>
+      <input type="password" id="gate-input" placeholder="Passcode" autocomplete="off" required />
+      <button type="submit">Enter</button>
+      <p id="gate-error" class="error hidden">Incorrect passcode. Try again.</p>
+    </form>
+  </div>
+
+  <div id="site" class="site hidden">
+    <header class="site-header">
+      <h1>Our Course</h1>
+      <nav class="site-nav">
+        <a href="#introductions" class="active">Introductions</a>
+      </nav>
+    </header>
+
+    <main>
+      <section id="introductions" class="section">
+        <h2>Introductions</h2>
+        <p class="section-sub">Meet your classmates — add your own profile below.</p>
+
+        <form id="profile-form" class="profile-form">
+          <div class="form-row">
+            <label for="firstName">First name</label>
+            <input type="text" id="firstName" maxlength="60" required />
+          </div>
+          <div class="form-row">
+            <label for="major">Major</label>
+            <input type="text" id="major" maxlength="80" required />
+          </div>
+          <div class="form-row">
+            <label for="year">Year</label>
+            <select id="year" required>
+              <option value="" disabled selected>Select year</option>
+              <option>Freshman</option>
+              <option>Sophomore</option>
+              <option>Junior</option>
+              <option>Senior</option>
+              <option>Graduate</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label for="hometown">Hometown / region</label>
+            <input type="text" id="hometown" maxlength="80" placeholder="e.g. Bay Area, CA" required />
+          </div>
+          <div class="form-row">
+            <label for="photo">Photo (optional)</label>
+            <input type="file" id="photo" accept="image/*" />
+            <div id="photo-preview" class="photo-preview hidden">
+              <img id="photo-preview-img" alt="Preview" />
+              <button type="button" id="photo-remove">Remove</button>
+            </div>
+          </div>
+          <button type="submit" id="submit-btn">Add my profile</button>
+          <p id="form-error" class="error hidden"></p>
+        </form>
+
+        <div id="profiles-status" class="status">Loading profiles...</div>
+        <div id="profiles-grid" class="profiles-grid"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
