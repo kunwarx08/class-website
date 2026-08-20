@@ -1,4 +1,4 @@
-import { put, head } from '@vercel/blob';
+import { put, head, BlobNotFoundError, BlobPreconditionFailedError } from '@vercel/blob';
 
 const PROFILES_PATH = 'data/profiles.json';
 const MAX_RETRIES = 4;
@@ -9,8 +9,6 @@ const ALLOWED_PHOTO_TYPES = {
   'image/webp': 'webp',
   'image/gif': 'gif',
 };
-
-class ConflictError extends Error {}
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -30,35 +28,41 @@ async function readProfiles() {
     const profiles = await response.json();
     return { profiles, etag: meta.etag };
   } catch (err) {
-    if (err && (err.message?.includes('not_found') || err.status === 404)) {
+    if (err instanceof BlobNotFoundError) {
       return { profiles: [], etag: null };
     }
     throw err;
   }
 }
 
+// Conditional write. When the blob already exists we pass its ETag via
+// ifMatch, so the write only lands if nobody else changed it since we read.
+// When it does not exist yet there is no ETag to match on, so allowOverwrite:
+// false makes the write create-only and a second concurrent creator fails
+// instead of silently overwriting the first.
 async function writeProfiles(profiles, expectedEtag) {
-  let current = null;
-  try {
-    current = await head(PROFILES_PATH);
-  } catch (err) {
-    if (!(err && (err.message?.includes('not_found') || err.status === 404))) {
-      throw err;
-    }
-  }
-
-  const currentEtag = current ? current.etag : null;
-  if (expectedEtag !== currentEtag) {
-    throw new ConflictError('Profiles changed since last read');
-  }
-
-  await put(PROFILES_PATH, JSON.stringify(profiles), {
+  const options = {
     access: 'public',
     contentType: 'application/json',
     addRandomSuffix: false,
-    allowOverwrite: true,
-    cacheControlMaxAge: 0,
-  });
+    cacheControlMaxAge: 60,
+  };
+
+  if (expectedEtag) {
+    options.allowOverwrite = true;
+    options.ifMatch = expectedEtag;
+  } else {
+    options.allowOverwrite = false;
+  }
+
+  await put(PROFILES_PATH, JSON.stringify(profiles), options);
+}
+
+function isWriteConflict(err) {
+  return (
+    err instanceof BlobPreconditionFailedError ||
+    /already exists/i.test(err?.message || '')
+  );
 }
 
 async function addProfileWithRetry(newProfile) {
@@ -69,14 +73,14 @@ async function addProfileWithRetry(newProfile) {
       await writeProfiles(updated, etag);
       return updated;
     } catch (err) {
-      if (err instanceof ConflictError && attempt < MAX_RETRIES) {
+      if (isWriteConflict(err) && attempt < MAX_RETRIES) {
         await sleep(120 * (attempt + 1) + Math.floor(Math.random() * 100));
         continue;
       }
       throw err;
     }
   }
-  throw new ConflictError('Could not save profile after multiple attempts');
+  throw new Error('Could not save profile after multiple attempts');
 }
 
 function randomId() {
