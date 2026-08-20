@@ -76,6 +76,10 @@ Recorded so we don't lose time to them twice:
   `package.json`.
 - **Connecting a Blob store does not always add `BLOB_READ_WRITE_TOKEN`.**
   Verify it is actually listed before assuming the connection worked.
+- **Vercel Functions reject request bodies over 4.5 MB** with a 413. Photos
+  are sent as base64, which inflates them by about a third, so the browser
+  downscales every photo to fit 1000px before upload. Keep that in mind
+  before raising any photo size limit.
 
 ## How we work together
 
