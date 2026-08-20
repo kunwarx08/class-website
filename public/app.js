@@ -144,20 +144,73 @@
     }
   }
 
-  photoInput.addEventListener('change', () => {
+  const MAX_PHOTO_DIMENSION = 1000;
+  // Vercel Functions reject request bodies over 4.5 MB, and base64 encoding
+  // inflates a photo by roughly a third, so keep the encoded string well under.
+  const MAX_UPLOAD_BYTES = 3 * 1024 * 1024;
+
+  function readFileAsDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error('Could not read that file.'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function loadImage(dataUrl) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('That file does not look like an image.'));
+      img.src = dataUrl;
+    });
+  }
+
+  // Photos straight off a phone are usually several megabytes, which would
+  // exceed the upload limit and make the grid slow to load. Shrinking them
+  // here keeps uploads small and the page quick on mobile.
+  async function shrinkImage(file) {
+    const img = await loadImage(await readFileAsDataUrl(file));
+
+    const scale = Math.min(1, MAX_PHOTO_DIMENSION / Math.max(img.width, img.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(img.width * scale));
+    canvas.height = Math.max(1, Math.round(img.height * scale));
+
+    const ctx = canvas.getContext('2d');
+    // Flatten onto white so transparent PNGs don't come out black as JPEG.
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+    for (const quality of [0.85, 0.7, 0.55, 0.4]) {
+      const candidate = canvas.toDataURL('image/jpeg', quality);
+      if (candidate.length <= MAX_UPLOAD_BYTES) return candidate;
+    }
+    throw new Error('That photo is too large. Please try a smaller one.');
+  }
+
+  photoInput.addEventListener('change', async () => {
+    formError.classList.add('hidden');
     const file = photoInput.files[0];
     if (!file) {
       photoDataUrl = null;
       photoPreview.classList.add('hidden');
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      photoDataUrl = reader.result;
+
+    try {
+      photoDataUrl = await shrinkImage(file);
       photoPreviewImg.src = photoDataUrl;
       photoPreview.classList.remove('hidden');
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      photoDataUrl = null;
+      photoInput.value = '';
+      photoPreview.classList.add('hidden');
+      formError.textContent = err.message;
+      formError.classList.remove('hidden');
+    }
   });
 
   photoRemove.addEventListener('click', () => {
